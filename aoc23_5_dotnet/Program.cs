@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 
-//	Read file longo string
+//	Read file into string
 
 var assembly = Assembly.GetExecutingAssembly();
 var resourceName = "aoc23_5_dotnet.input.txt";
@@ -28,16 +28,8 @@ long[][] parseTable(long tableIndex)
 	dataStrings = dataStrings.Where((x) => x.Length == 3).ToArray();
 	long[][] data = dataStrings.Select((x) => x.Select((y) => long.Parse(y)).ToArray()).ToArray();
 
+	//	Marginal optimization to order the tables by input ranges so we can escape earlier in the loop
 	data = data.OrderBy(x => x[1]).ToArray();
-
-	/*    for (long i = 0; i < data.Length; i++)
-		{
-			for (long j = 0; j < data[i].Length; j++)
-			{
-				Console.Write($"{data[i][j]} ");
-			}
-			Console.Write("\n");
-		}*/
 
 	return data;
 }
