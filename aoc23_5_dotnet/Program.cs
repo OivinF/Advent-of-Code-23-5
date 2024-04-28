@@ -13,7 +13,7 @@ var resourceName = "aoc23_5_dotnet.input.txt";
 
 string text = "";
 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
-using (StreamReader reader = new StreamReader(stream))
+using (StreamReader reader = new(stream))
 {
 	text = reader.ReadToEnd();
 }
@@ -27,9 +27,6 @@ long[][] parseTable(long tableIndex)
 	string[][] dataStrings = rows.Select((x) => x.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToArray()).ToArray();
 	dataStrings = dataStrings.Where((x) => x.Length == 3).ToArray();
 	long[][] data = dataStrings.Select((x) => x.Select((y) => long.Parse(y)).ToArray()).ToArray();
-
-	//	Marginal optimization to order the tables by input ranges so we can escape earlier in the loop
-	data = data.OrderBy(x => x[1]).ToArray();
 
 	return data;
 }
@@ -73,14 +70,8 @@ long remap(long inputNumber, long[][] remapTable)
 {
 	for (long i = 0; i < remapTable.Length; i++)
 	{
-		//	Because the ranges are sorted, if the seed falls below the current range it falls below all ranges
-		if (inputNumber <= remapTable[i][1])
-		{
-			return (inputNumber);
-		}
-
 		//	Check if this seed can be remapped with the current range
-		if (inputNumber <= remapTable[i][1] + remapTable[i][2])
+		if (remapTable[i][1] <= inputNumber && inputNumber <= remapTable[i][1] + remapTable[i][2])
 		{
 			return ((inputNumber - remapTable[i][1]) + remapTable[i][0]);
 		}
@@ -120,6 +111,8 @@ void NaiveSolution()
 	Console.WriteLine($"Lowest location number: {lowestLocation}");
 }
 
+//	Unused. This was for an idea to use a compute shader to calculate every seed in parallel, but it turns out
+//	working with 64 bit integers (longs) in a shader is only supported in model 6.0+ and a pain in general
 void BakeMaps()
 {
 	long[][][] maps = [seed2soil, soil2fert, fert2water, water2light, light2temp, temp2humidity, humidity2location];
@@ -129,8 +122,6 @@ void BakeMaps()
 
 async Task ComputeMultiThreaded()
 {
-	Thread mainThread = Thread.CurrentThread;
-
 	Stopwatch sw = new();
 	sw.Start();
 
@@ -138,10 +129,11 @@ async Task ComputeMultiThreaded()
 
 	for (int i = 0; i < seeds.Length / 2; i++)
 	{
-		Console.WriteLine($"Dispatching task {i}");
+		Console.WriteLine($"Dispatching task #{i}");
 		int seedIndex = i * 2;
 		int rangeIndex = seedIndex + 1;
-		tasks[i] = Task.Run(() => CheckSingleSeedRange(seeds[seedIndex], seeds[rangeIndex]));
+		int taskIndex = i;
+		tasks[i] = Task.Run(() => CheckSingleSeedRange(seeds[seedIndex], seeds[rangeIndex], taskIndex));
 	}
 
 	Console.WriteLine("Waiting for tasks...");
@@ -154,8 +146,9 @@ async Task ComputeMultiThreaded()
 	Console.WriteLine($"Elapsed: {sw.Elapsed}");
 	Console.WriteLine($"Lowest location number: {res}");
 
-	long CheckSingleSeedRange(long seed, long range)
+	long CheckSingleSeedRange(long seed, long range, int taskID)
 	{
+		Console.WriteLine($"Running task #{taskID} on thread: {Environment.CurrentManagedThreadId} with range {range}");
 		long lowestLocation = long.MaxValue;
 
 		for (int j = 0; j < range; j++)
@@ -174,9 +167,11 @@ async Task ComputeMultiThreaded()
 			}
 		}
 
+		Console.WriteLine($"Task #{taskID} complete on thread: {Environment.CurrentManagedThreadId} with result {lowestLocation}");
 		return lowestLocation;
 	}
 
 }
 
 await ComputeMultiThreaded();
+Console.ReadKey();
